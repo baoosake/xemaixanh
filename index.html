@@ -562,9 +562,9 @@
                                 `📍 <b>Trả tại:</b> ${dropoff}\n` +
                                 `📝 <b>Ghi chú:</b> ${notes}`;
 
-                fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                fetch(`https://api.telegram.org/bot${8951131597:AAFn2TdXWQqbA74Suy1TyfEGKblr86ORs7Q}/sendMessage`, {
                     method: "POST", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: message, parse_mode: "HTML" })
+                    body: JSON.stringify({ chat_id: 6604454027, text: message, parse_mode: "HTML" })
                 }).catch(console.error);
 
                 Swal.fire({
