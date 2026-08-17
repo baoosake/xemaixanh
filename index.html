@@ -265,10 +265,10 @@
                         <label>Số điện thoại:</label>
                         <div class="input-group">
                             <i class="fa-solid fa-phone"></i>
-                            <input type="tel" class="form-control" id="cusPhone" placeholder="Ví dụ: 0901234567" pattern="[0-9]{10,11}" title="Vui lòng nhập 10-11 số" required>
+                            <input type="number" class="form-control" id="cusPhone" placeholder="Ví dụ: 0901234567" required>
                         </div>
                     </div>
-                    <!-- Hàng 2 (Mới) -->
+                    <!-- Hàng 2 -->
                     <div class="form-group">
                         <label>Giới tính:</label>
                         <div class="input-group">
@@ -352,7 +352,7 @@
     <!-- TÍCH HỢP FIREBASE & TELEGRAM (MODULE) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, query, where, onSnapshot, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, where, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
         // CẤU HÌNH FIREBASE
         const firebaseConfig = {
@@ -365,7 +365,7 @@
         };
 
         // CẤU HÌNH TELEGRAM BOT
-        const TELEGRAM_BOT_TOKEN = "8951131597:AAFn2TdXWQqbA74Suy1TyfEGKblr86ORs7Q";
+        const TELEGRAM_BOT_TOKEN = "8951131597:AAEmG-Mgd1L8QHY0pqFZUaoGQQKStVyKQuA";
         const TELEGRAM_CHAT_ID = "6604454027";
 
         const app = initializeApp(firebaseConfig);
@@ -540,7 +540,6 @@
             const route = document.getElementById('routeSelect').value;
             const date = document.getElementById('dateSelect').value;
 
-            // Thêm trường status = "pending" (Đang chờ xác nhận)
             const newBooking = { 
                 id: bookingId, name: name, phone: phone, gender: gender,
                 pickup: pickup, dropoff: dropoff, notes: notes, 
@@ -562,10 +561,37 @@
                                 `📍 <b>Trả tại:</b> ${dropoff}\n` +
                                 `📝 <b>Ghi chú:</b> ${notes}`;
 
-                fetch(`https://api.telegram.org/bot${8951131597:AAFn2TdXWQqbA74Suy1TyfEGKblr86ORs7Q}/sendMessage`, {
-                    method: "POST", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ chat_id: 6604454027, text: message, parse_mode: "HTML" })
-                }).catch(console.error);
+                try {
+                    const telegramResponse = await fetch(
+                        `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+                        {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                chat_id: TELEGRAM_CHAT_ID,
+                                text: message,
+                                parse_mode: "HTML"
+                            })
+                        }
+                    );
+
+                    const telegramResult = await telegramResponse.json();
+
+                    if (!telegramResponse.ok || !telegramResult.ok) {
+                        console.error("Telegram API lỗi:", telegramResult);
+                        throw new Error(telegramResult.description || "Telegram không gửi được tin nhắn.");
+                    }
+
+                    console.log("Telegram đã gửi thành công:", telegramResult);
+                } catch (telegramError) {
+                    console.error("LỖI TELEGRAM:", telegramError);
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Đã lưu vé nhưng Telegram lỗi',
+                        text: 'Thông tin đặt vé đã được lưu vào hệ thống, nhưng chưa gửi được thông báo Telegram. Kiểm tra Bot Token, Chat ID hoặc Console (F12).',
+                        confirmButtonColor: '#0f172a'
+                    });
+                }
 
                 Swal.fire({
                     icon: 'success',
@@ -606,7 +632,6 @@
             container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--gold);"><i class="fa-solid fa-spinner fa-spin fa-2x"></i></div>';
 
             try {
-                // Sắp xếp ngày tạo mới nhất lên đầu
                 const q = query(collection(db, "bookings"), where("phone", "==", phone));
                 const querySnapshot = await getDocs(q);
                 
@@ -616,13 +641,11 @@
                 }
 
                 let html = '';
-                // Chuyển kết quả ra Array để sort thủ công (do query composite cần tạo Index trên Firebase)
                 let results = [];
                 querySnapshot.forEach(doc => results.push(doc.data()));
                 results.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
                 results.forEach((b) => {
-                    // Logic Huy hiệu trạng thái
                     let statusHtml = '';
                     if (!b.status || b.status === "pending") {
                         statusHtml = `<div class="status-badge status-pending"><i class="fa-solid fa-clock-rotate-left"></i> Đang chờ xác nhận</div>`;
