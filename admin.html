@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Quản Lý Nhà Xe Mai Anh</title>
+    
+    <!-- Google Fonts & FontAwesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        :root {
+            --primary: #0f172a; 
+            --gold: #d4af37;
+            --danger: #ef4444;
+            --success: #059669;
+            --bg: #f8fafc;
+            --border: #e2e8f0;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg); color: #334155; }
+        
+        /* Form Đăng Nhập */
+        #loginSection { max-width: 400px; margin: 100px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; }
+        #loginSection h2 { color: var(--primary); margin-bottom: 20px; }
+        .form-control { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid var(--border); border-radius: 6px; outline: none; }
+        .form-control:focus { border-color: var(--gold); }
+        .btn-primary { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.3s;}
+        .btn-primary:hover { background: var(--gold); color: var(--primary); }
+
+        /* Dashboard */
+        #adminDashboard { max-width: 1200px; margin: 30px auto; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+        .header-top { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border); padding-bottom: 15px; margin-bottom: 20px; }
+        .header-top h2 { color: var(--primary); }
+        
+        /* Bộ lọc ngày */
+        .filter-section { display: flex; align-items: center; gap: 15px; background: white; padding: 15px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 15px; }
+        
+        /* Bảng dữ liệu */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        th { background: var(--primary); color: white; font-weight: 600; font-size: 0.95rem; }
+        tr:hover { background: #f8fafc; }
+        
+        /* Dropdown trong bảng */
+        select.table-select { padding: 6px; border-radius: 6px; border: 1px solid var(--border); font-weight: 500; outline: none; cursor: pointer; }
+        select.table-select:focus { border-color: var(--gold); }
+        
+        /* Nút hành động */
+        .btn-action { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; color: white; margin-right: 5px; transition: 0.2s;}
+        .btn-edit { background: #0ea5e9; }
+        .btn-delete { background: var(--danger); }
+        .btn-filter { background: var(--primary); padding: 10px 15px; }
+        .btn-filter:hover { background: var(--gold); color: var(--primary); }
+
+        /* Modal Sửa */
+        #editModal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 1000; width: 450px; }
+        #modalOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; }
+    </style>
+</head>
+<body>
+
+    <!-- 1. MÀN HÌNH ĐĂNG NHẬP -->
+    <div id="loginSection">
+        <h2><i class="fa-solid fa-user-shield"></i> Quản Trị Hệ Thống</h2>
+        <input type="email" id="email" class="form-control" placeholder="Email quản trị">
+        <input type="password" id="password" class="form-control" placeholder="Mật khẩu">
+        <button class="btn-primary" onclick="login()">Đăng Nhập</button>
+    </div>
+
+    <!-- 2. MÀN HÌNH QUẢN LÝ VÉ -->
+    <div id="adminDashboard" style="display: none;">
+        <div class="header-top">
+            <h2><i class="fa-solid fa-clipboard-list"></i> Danh Sách Đặt Vé</h2>
+            <button onclick="logout()" class="btn-action btn-delete"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</button>
+        </div>
+
+        <!-- BỘ LỌC TÌM KIẾM THEO NGÀY -->
+        <div class="filter-section">
+            <label style="font-weight: 600;"><i class="fa-solid fa-filter"></i> Lọc vé theo ngày đi:</label>
+            <input type="date" id="filterDate" class="form-control" style="width: auto; margin:0;" onchange="loadBookings()">
+            <button class="btn-action btn-filter" onclick="resetFilter()"><i class="fa-solid fa-rotate-right"></i> Xem Tất Cả</button>
+            <span style="font-size: 0.9rem; color: #64748b; margin-left: auto;">*Đổi trạng thái sang "Đã hủy" để trả ghế, không nên dùng nút Xóa.</span>
+        </div>
+
+        <!-- BẢNG DỮ LIỆU VÉ -->
+        <table>
+            <thead>
+                <tr>
+                    <th>Mã Vé</th>
+                    <th>Khách Hàng</th>
+                    <th>Tuyến / Ngày đi</th>
+                    <th>Vị Trí Ghế</th>
+                    <th>Biển Số Xe (Gán riêng)</th>
+                    <th>Trạng Thái</th>
+                    <th>Thao Tác</th>
+                </tr>
+            </thead>
+            <tbody id="ticketList">
+                <tr><td colspan="7" style="text-align: center;">Đang tải dữ liệu...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 3. MODAL SỬA VÉ (Nâng cấp) -->
+    <div id="modalOverlay"></div>
+    <div id="editModal">
+        <h3 style="margin-top:0; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 10px;"><i class="fa-solid fa-pen-to-square"></i> Sửa Thông Tin Chi Tiết</h3>
+        <input type="hidden" id="editId">
+        
+        <p style="margin: 15px 0;">Khách hàng: <strong id="editName" style="color: var(--gold); font-size: 1.1rem;"></strong></p>
+        
+        <div style="margin-bottom: 15px;">
+            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Đổi ngày đi mới:</label>
+            <input type="date" id="editDate" class="form-control" style="margin:0;">
+        </div>
+
+        <div style="margin-bottom: 15px;">
+            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Đổi vị trí ghế mới:</label>
+            <p style="font-size: 0.85rem; color: #666; margin-bottom: 5px;">(Các ghế cách nhau bằng dấu phẩy. VD: A01, A02)</p>
+            <input type="text" id="editSeats" class="form-control" style="margin:0;">
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Biển số xe (Nhập tay nếu xe ngoài):</label>
+            <input type="text" id="editPlate" class="form-control" style="margin:0;" placeholder="Nhập biển số xe (VD: 77H-999.99)">
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <button onclick="closeEdit()" style="padding: 10px 15px; background: #e2e8f0; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Hủy</button>
+            <button onclick="saveEdit()" style="padding: 10px 15px; background: var(--gold); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;"><i class="fa-solid fa-floppy-disk"></i> Lưu Thay Đổi</button>
+        </div>
+    </div>
+
+    <!-- SCRIPT CHỨC NĂNG -->
+    <script>
+        // CẤU HÌNH SUPABASE (Dùng đúng cấu hình của bạn)
+        const SUPABASE_URL = "https://knhcjleztqgnrtgucxxt.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtuaGNqbGV6dHFnbnJ0Z3VjeHh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5MzU2MjcsImV4cCI6MjEwMjUxMTYyN30.2VLxrqmACcQB_4Js3crZ3jlWl5l_XWoWUQJbXqTnzz8";
+
+        const { createClient } = supabase;
+        const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // KIỂM TRA ĐĂNG NHẬP SẴN
+        window.onload = async () => {
+            const today = new Date();
+            const formattedDate = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+            
+            document.getElementById('filterDate').value = formattedDate; 
+            
+            const { data } = await db.auth.getSession();
+            if (data.session) {
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('adminDashboard').style.display = 'block';
+                loadBookings();
+            }
+        };
+
+        // 1. ĐĂNG NHẬP
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const btn = document.querySelector('#loginSection button');
+            
+            btn.innerText = "Đang kiểm tra...";
+            const { data, error } = await db.auth.signInWithPassword({ email, password });
+            
+            if (error) {
+                alert("Sai tài khoản hoặc mật khẩu!");
+                btn.innerText = "Đăng Nhập";
+            } else {
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('adminDashboard').style.display = 'block';
+                loadBookings();
+            }
+        }
+
+        // ĐĂNG XUẤT
+        async function logout() {
+            await db.auth.signOut();
+            location.reload();
+        }
+
+        // ĐẶT LẠI BỘ LỌC
+        function resetFilter() {
+            document.getElementById('filterDate').value = '';
+            loadBookings();
+        }
+
+        // 2. TẢI DANH SÁCH VÉ LÊN BẢNG (GÁN XE TRỰC TIẾP TRÊN DÒNG)
+        async function loadBookings() {
+            const tbody = document.getElementById('ticketList');
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center;"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải dữ liệu...</td></tr>`;
+            
+            const filterDate = document.getElementById('filterDate').value;
+            
+            let query = db.from('bookings').select('*').order('created_at', { ascending: false });
+            if (filterDate) {
+                query = query.eq('date', filterDate);
+            }
+
+            const { data, error } = await query;
+            
+            if (error) { tbody.innerHTML = `<tr><td colspan="7">Lỗi tải dữ liệu: ${error.message}</td></tr>`; return; }
+            if (data.length === 0) { tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;">Không có vé nào trong ngày này.</td></tr>`; return; }
+
+            let html = '';
+            data.forEach(b => {
+                let trStyle = b.status === 'cancelled' ? 'opacity: 0.6; background-color: #fef2f2;' : '';
+                
+                // MÀU SẮC CHO Ô BIỂN SỐ XE
+                let plateStyle = b.bus_plate ? 'color: var(--success); border-color: var(--success); background: #f0fdf4;' : 'color: #d97706; border-color: #fcd34d; background: #fffbeb;';
+                let currentPlate = b.bus_plate || '';
+
+                // HTML cho Select Biển số xe trực tiếp trên dòng
+                let plateSelectHtml = `
+                    <select onchange="updatePlate('${b.id}', this.value)" class="table-select" style="${plateStyle} width: 140px;">
+                        <option value="" style="color: black;">-- Chưa xếp xe --</option>
+                        <option value="77H-093.15" style="color: black;" ${currentPlate === '77H-093.15' ? 'selected' : ''}>77H-093.15</option>
+                        <option value="77H-093.25" style="color: black;" ${currentPlate === '77H-093.25' ? 'selected' : ''}>77H-093.25</option>
+                        <option value="77H-093.31" style="color: black;" ${currentPlate === '77H-093.31' ? 'selected' : ''}>77H-093.31</option>
+                        <option value="77H-093.37" style="color: black;" ${currentPlate === '77H-093.37' ? 'selected' : ''}>77H-093.37</option>
+                        ${currentPlate && !['77H-093.15','77H-093.25','77H-093.31','77H-093.37'].includes(currentPlate) ? `<option value="${currentPlate}" selected style="color: black;">${currentPlate} (Xe ngoài)</option>` : ''}
+                    </select>
+                `;
+
+                html += `
+                <tr style="${trStyle}">
+                    <td><strong>${b.id}</strong></td>
+                    <td>${b.name}<br><small style="color:#64748b;"><i class="fa-solid fa-phone"></i> ${b.phone}</small></td>
+                    <td>${b.route}<br><strong style="color:var(--primary); font-size:0.9rem;">${b.date}</strong></td>
+                    <td><strong style="color:var(--danger);">${b.seats.join(', ')}</strong></td>
+                    <td>${plateSelectHtml}</td>
+                    <td>
+                        <select onchange="updateStatus('${b.id}', this.value)" class="table-select" style="border-color: ${b.status==='cancelled'?'var(--danger)':'var(--border)'}">
+                            <option value="pending" ${b.status=='pending'?'selected':''}>Chờ xử lý</option>
+                            <option value="confirmed" ${b.status=='confirmed'?'selected':''}>Xác nhận</option>
+                            <option value="cancelled" ${b.status=='cancelled'?'selected':''}>Đã hủy</option>
+                        </select>
+                    </td>
+                    <td>
+                        <button class="btn-action btn-edit" onclick="openEdit('${b.id}', '${b.name}', '${b.date}', '${b.seats.join(', ')}', '${currentPlate}')"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn-action btn-delete" onclick="deleteBooking('${b.id}')"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+        }
+
+        // 3. HÀM CẬP NHẬT BIỂN SỐ XE TỪNG NGƯỜI TRÊN BẢNG
+        async function updatePlate(id, newPlate) {
+            const plateValue = newPlate.trim() === "" ? null : newPlate;
+            const { error } = await db.from('bookings').update({ bus_plate: plateValue }).eq('id', id);
+            
+            if (error) {
+                alert("Lỗi khi cập nhật biển số: " + error.message);
+            } else {
+                // Đổi màu trực tiếp giao diện (hoặc reload lại dữ liệu)
+                loadBookings();
+            }
+        }
+
+        // 4. CẬP NHẬT TRẠNG THÁI (XÁC NHẬN/HỦY)
+        async function updateStatus(id, newStatus) {
+            await db.from('bookings').update({ status: newStatus }).eq('id', id);
+            loadBookings(); 
+        }
+
+        // 5. XÓA VÉ HOÀN TOÀN
+        async function deleteBooking(id) {
+            const warningMsg = "⚠️ QUAN TRỌNG ⚠️\n\nNếu bạn XÓA, khách này sẽ MẤT VĨNH VIỄN khỏi lịch sử.\nKhuyên dùng: Đổi trạng thái thành 'ĐÃ HỦY' để trả ghế mà vẫn giữ lịch sử.\n\nChắc chắn xóa?";
+            if(confirm(warningMsg)) {
+                await db.from('bookings').delete().eq('id', id);
+                loadBookings();
+            }
+        }
+
+        // 6. CÁC HÀM XỬ LÝ MODAL SỬA THÔNG TIN CHI TIẾT
+        function openEdit(id, name, date, seatsStr, plate) {
+            document.getElementById('editId').value = id;
+            document.getElementById('editName').innerText = name;
+            document.getElementById('editDate').value = date;
+            document.getElementById('editSeats').value = seatsStr; 
+            document.getElementById('editPlate').value = plate || ""; // Load biển số vào modal
+            
+            document.getElementById('editModal').style.display = 'block';
+            document.getElementById('modalOverlay').style.display = 'block';
+        }
+
+        function closeEdit() {
+            document.getElementById('editModal').style.display = 'none';
+            document.getElementById('modalOverlay').style.display = 'none';
+        }
+
+        async function saveEdit() {
+            const id = document.getElementById('editId').value;
+            const newDate = document.getElementById('editDate').value;
+            const seatsInput = document.getElementById('editSeats').value;
+            let newPlate = document.getElementById('editPlate').value.trim();
+
+            const newSeatsArray = seatsInput.split(',').map(s => s.trim()).filter(s => s !== '');
+            if (newSeatsArray.length === 0) { alert("Phải có ít nhất 1 mã ghế!"); return; }
+
+            const updateData = { 
+                date: newDate, 
+                seats: newSeatsArray,
+                bus_plate: newPlate === "" ? null : newPlate 
+            };
+
+            const { error } = await db.from('bookings').update(updateData).eq('id', id);
+
+            if (error) alert("Lỗi cập nhật: " + error.message);
+            else {
+                closeEdit();
+                loadBookings();
+            }
+        }
+    </script>
+</body>
+</html>
